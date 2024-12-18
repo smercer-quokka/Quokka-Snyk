@@ -1,0 +1,8 @@
+{
+    "quokka_api_key": "your-quokka-api-key",
+    "snyk_api_key": "your-snyk-api-key",
+    "binary": "path/to/your/binary.apk",
+    "snyk_org_id": "your-snyk-org-id",
+    "snyk_project_id": "your-snyk-project-id",
+    "quokka_uuid": null
+}

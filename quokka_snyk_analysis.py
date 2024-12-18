@@ -66,25 +66,43 @@ def downloadQuokkaJSON(apiKey, uuid):
 
 
 def retrieveSnykJSON(apiKey, orgID, projectID):
-    """Retrieve issues from Snyk API and filter by project ID."""
+    """Retrieve all issues from Snyk API, handling pagination, and filter by project ID."""
     try:
-        url = f"https://api.snyk.io/rest/orgs/{orgID}/issues?version=2023-11-27~beta"
+        base_url = f"https://api.snyk.io/rest/orgs/{orgID}/issues?version=2023-11-27~beta&limit=50"
         headers = {
             "Accept": "application/vnd.api+json",
             "Authorization": f"token {apiKey}",
             "User-Agent": 'quokka-snyk-0.0.0'
         }
 
-        response = requests.get(url, headers=headers, timeout=30)
-        response.raise_for_status()
+        all_issues = []
+        next_url = base_url
 
-        response_json = response.json()
-        filtered_issues = [
-            issue for issue in response_json.get("data", [])
-            if issue.get("relationships", {}).get("scan_item", {}).get("data", {}).get("id") == projectID
-        ]
+        while next_url:
+            response = requests.get(next_url, headers=headers, timeout=30)
+            response.raise_for_status()
+            response_json = response.json()
 
-        return {"data": filtered_issues}
+            # Collect issues from the current page and filter by project ID
+            filtered_issues = [
+                issue for issue in response_json.get("data", [])
+                if issue.get("relationships", {}).get("scan_item", {}).get("data", {}).get("id") == projectID
+            ]
+            all_issues.extend(filtered_issues)
+
+            # Break the loop if the data object is empty
+            if not response_json.get("data"):
+                break
+
+            # Check for the next page link
+            next_url_path = response_json.get("links", {}).get("next")
+            if next_url_path:
+                next_url = f"https://api.snyk.io{next_url_path}"
+            else:
+                next_url = None
+
+        return {"data": all_issues}
+
     except requests.exceptions.RequestException as e:
         logging.error(f"Network error while retrieving Snyk JSON: {e}")
         return {"data": []}
@@ -98,17 +116,26 @@ def merge_issues_and_save(quokka_issues, snyk_issues, platform_name, uuid, snyk_
     joint_dict_list = []
 
     for issue in snyk_issues["data"]:
+        # Safely access nested keys with default values
+        risk_score = issue.get("attributes", {}).get("risk", {}).get("score", {}).get("value", "NA")
+        effective_severity_level = issue.get("attributes", {}).get("effective_severity_level", "NA")
+        title = issue.get("attributes", {}).get("title", "NA")
+        cwe = issue.get("attributes", {}).get("classes", [{}])[0].get("id", "NA")
+        status = issue.get("attributes", {}).get("status", "NA")
+        issue_type = issue.get("attributes", {}).get("problems", [{}])[0].get("type", "NA")
+        project_id = issue.get("relationships", {}).get("scan_item", {}).get("data", {}).get("id", "NA")
+
         row_dict = {
             "id": issue["id"],
             "Found by": "Snyk",
-            "Issue Severity": issue["attributes"]["effective_severity_level"],
-            "Score": issue["attributes"]["risk"]["score"]["value"],
-            "Problem title": issue["attributes"]["title"],
-            "CWE": issue["attributes"]["classes"][0]["id"],
+            "Issue Severity": effective_severity_level,
+            "Score": risk_score,
+            "Problem title": title,
+            "CWE": cwe,
             "CVSS Score": "NA",
-            "Project URL": f"https://app.snyk.io/org/{snyk_org_id}/project/{issue['relationships']['scan_item']['data']['id']}",
-            "Issue status": issue["attributes"]["status"],
-            "Issue type": issue["attributes"]["problems"][0]["type"],
+            "Project URL": f"https://app.snyk.io/org/{snyk_org_id}/project/{project_id}",
+            "Issue status": status,
+            "Issue type": issue_type,
         }
         joint_dict_list.append(row_dict)
 
@@ -117,11 +144,11 @@ def merge_issues_and_save(quokka_issues, snyk_issues, platform_name, uuid, snyk_
             row_dict = {
                 "id": issue["id"],
                 "Found by": "Quokka",
-                "Issue Severity": issue["risk"],
+                "Issue Severity": issue.get("risk", "NA"),
                 "Score": "NA",
-                "Problem title": issue["positive_finding_text"],
-                "CWE": issue["cwe"],
-                "CVSS Score": issue["cvss_score"],
+                "Problem title": issue.get("positive_finding_text", "NA"),
+                "CWE": issue.get("cwe", "NA"),
+                "CVSS Score": issue.get("cvss_score", "NA"),
                 "Project URL": f"https://emm.krwr.net/#/{platform_name}-report/{uuid}",
                 "Issue status": "open",
                 "Issue type": "vulnerability",
@@ -147,6 +174,7 @@ binary = config["binary"]
 snyk_org_id = config["snyk_org_id"]
 snyk_project_id = config["snyk_project_id"]
 quokka_uuid = config.get("quokka_uuid")
+platform = config.get("platform")
 
 # Ensure API keys are present
 if not quokka_api_key or not snyk_api_key:
@@ -159,7 +187,7 @@ if not quokka_uuid:
     uuid = scan_response["uuid"]
 else:
     uuid = quokka_uuid
-    platform_name = "android"
+    platform_name = platform
 
 quokka_issue_data = downloadQuokkaJSON(quokka_api_key, uuid)
 

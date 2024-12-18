@@ -40,7 +40,8 @@ Create a `config.json` file in the same directory as the script with the followi
   "snyk_org_id": "your-snyk-org-id",
   "snyk_project_id": "your-snyk-project-id",
   "quokka_uuid": null,
-  "platform": "mobile-os (android/ios)"
+  "platform": "mobile-os (android/ios)",
+  "snyk_org_url": "org_url"
 }
 ```
 
@@ -51,6 +52,7 @@ Create a `config.json` file in the same directory as the script with the followi
 - **`snyk_project_id`**: The Snyk project ID to filter the issues.
 - **`quokka_uuid`**: (Optional) If you already have a Quokka UUID, you can provide it to skip the upload process.
 - **`platform`**: Mobile operationg system for the application you are scanning
+- **`snyk_org_url`**: URL in your snyk org to combile issue links i.e. https://app.snyk.io/org/quokka-nfr-shared
 
 ## How to Run the Script
 

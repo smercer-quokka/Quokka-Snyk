@@ -124,6 +124,7 @@ def merge_issues_and_save(quokka_issues, snyk_issues, platform_name, uuid, snyk_
         status = issue.get("attributes", {}).get("status", "NA")
         issue_type = issue.get("attributes", {}).get("problems", [{}])[0].get("type", "NA")
         project_id = issue.get("relationships", {}).get("scan_item", {}).get("data", {}).get("id", "NA")
+        key = issue.get("attributes", {}).get("key", "NA")
 
         row_dict = {
             "id": issue["id"],
@@ -133,7 +134,7 @@ def merge_issues_and_save(quokka_issues, snyk_issues, platform_name, uuid, snyk_
             "Problem title": title,
             "CWE": cwe,
             "CVSS Score": "NA",
-            "Project URL": f"https://app.snyk.io/org/{snyk_org_id}/project/{project_id}",
+            "Project URL": f"{snyk_org_url}/project/{project_id}#issue-{key}",
             "Issue status": status,
             "Issue type": issue_type,
         }
@@ -175,6 +176,7 @@ snyk_org_id = config["snyk_org_id"]
 snyk_project_id = config["snyk_project_id"]
 quokka_uuid = config.get("quokka_uuid")
 platform = config.get("platform")
+snyk_org_url = config.get("snyk_org_url")
 
 # Ensure API keys are present
 if not quokka_api_key or not snyk_api_key:
